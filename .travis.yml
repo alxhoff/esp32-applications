@@ -1,0 +1,40 @@
+# This will run on Travis' 'new' container-based infrastructure
+sudo: false
+
+language: c
+
+os: linux
+
+python: "2.7"
+
+# Install dependencies
+addons:
+    apt:
+        packages:
+            - git
+            - wget
+            - libncurses-dev
+            - flex
+            - bison
+            - gperf
+            - python-pip
+            - python-setuptools
+            - python-serial
+            - python-cryptography
+            - python-future
+            - python-pyparsing
+            - python-pyelftools
+            - cmake
+            - ninja-build
+            - ccache
+
+# Build your code e.g. by calling make
+script:
+    - git clone --recursive https://github.com/espressif/esp-idf.git
+    - ./esp-idf/install.sh
+    - . esp-idf/export.sh
+    - cd arp_scanner
+    - mkdir build
+    - cd build
+    - cmake ..
+    - make
