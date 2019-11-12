@@ -13,14 +13,19 @@
 #include "argtable3/argtable3.h"
 #include "driver/uart.h"
 #include "esp_console.h"
+#include "esp_ping.h"
 #include "esp_vfs_dev.h"
 #include "linenoise/linenoise.h"
+#include "ping/ping.h"
 
 #define WIFI_CONNECTED_BIT BIT0
 
 #define DEFAULT_SSID "All_praise_Linus"
 #define DEFAULT_PASSWORD "derpderp"
 #define DEFAULT_TIMEOUT (10000)
+
+static const u8_t ping_count = 1;
+static u32_t ping_timeout = DEFAULT_TIMEOUT;
 
 // https://www.oreilly.com/library/view/80211-wireless-networks/0596100523/ch04.html
 typedef struct {
@@ -46,6 +51,26 @@ static void wifi_event_handler(void) {}
 
 static void ip_event_handler(void) {}
 
+#define PING_TIMEOUT 1000
+#define PING_COUNT 1
+
+static esp_err_t ping_results(ping_target_id_t found_id, esp_ping_found* found_val)
+{
+    printf("AvgTime:%.1fmS Sent:%d Rec:%d Err:%d min(mS):%d max(mS):%d ", (float)found_val->total_time / found_val->recv_count, found_val->send_count, found_val->recv_count, found_val->err_count, found_val->min_time, found_val->max_time);
+    printf("Resp(mS):%d Timeouts:%d Total Time:%d\n", found_val->resp_time, found_val->timeout_count, found_val->total_time);
+
+    return ESP_OK;
+}
+
+static void ping_target(u32_t ip)
+{
+    esp_ping_set_target(PING_TARGET_IP_ADDRESS_COUNT, &ping_count, sizeof(ping_count));
+    esp_ping_set_target(PING_TARGET_RCV_TIMEO, &ping_timeout, sizeof(ping_timeout));
+    esp_ping_set_target(PING_TARGET_IP_ADDRESS, &ip, sizeof(ip));
+    esp_ping_set_target(PING_TARGET_RES_FN, &ping_results, sizeof(ping_results));
+    ping_init();
+}
+
 // Promiscuous packets can have the following types
 // WIFI_PKG_MGMT - management frames
 // WIFI_PKT_CTRL - control frames
@@ -56,16 +81,13 @@ static void sniff_packet(void* buff, wifi_promiscuous_pkt_type_t type)
     switch (type) {
     case WIFI_PKT_MGMT: {
         const wifi_promiscuous_pkt_t* packet = (wifi_promiscuous_pkt_t*)buff;
-        const data_frame_t frame = (data_frame_t*)packet->payload;
+        const data_frame_t* frame = (data_frame_t*)packet->payload;
+        const wifi_pkt_rx_ctrl_t* rx_ctrl = &packet->rx_ctrl;
     } break;
     case WIFI_PKT_CTRL:
-
         break;
-
     case WIFI_PKT_DATA:
-
         break;
-
     default:
         break;
     }
@@ -178,7 +200,7 @@ static int get_version(int argc, char** argv)
     printf("Chip info:\r\n");
     printf("\tmodel:%s\r\n", info.model == CHIP_ESP32 ? "ESP32" : "Unknow");
     printf("\tcores:%d\r\n", info.cores);
-    printf("\tfeature:%s%s%s%s%d%s\r\n", info.features & CHIP_FEATURE_WIFI_BGN ? "/802.11bgn" : "", info.features & CHIP_FEATURE_BLE ? "/BLE" : "", info.features & CHIP_FEATURE_BT ? "/BT" : "", info.features & CHIP_FEATURE_EMB_FLASH ? "/Embedded-Flash:" : "/External-Flash:", spi_flash_get_chip_size() / (1024 * 1024), " MB");
+    printf("\tfeature:%s%s%s%s%u%s\r\n", info.features & CHIP_FEATURE_WIFI_BGN ? "/802.11bgn" : "", info.features & CHIP_FEATURE_BLE ? "/BLE" : "", info.features & CHIP_FEATURE_BT ? "/BT" : "", info.features & CHIP_FEATURE_EMB_FLASH ? "/Embedded-Flash:" : "/External-Flash:", spi_flash_get_chip_size() / (1024 * 1024), " MB");
     printf("\trevision number:%d\r\n", info.revision);
     return 0;
 }
@@ -196,7 +218,7 @@ void register_version(void)
 
 static bool wifi_join(const char* ssid, const char* pass, int timeout_ms)
 {
-    wifi_config_t cfg = { 0 };
+    wifi_config_t cfg = { { { 0 } } };
     strlcpy((char*)cfg.sta.ssid, ssid, sizeof(cfg.sta.ssid));
     if (pass)
         strlcpy((char*)cfg.sta.password, pass, sizeof(cfg.sta.password));
