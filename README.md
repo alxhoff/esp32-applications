@@ -1,5 +1,14 @@
 # ESP32 apps
 
+<p>
+  <a href="https://travis-ci.com/alxhoff/esp32-applications">
+  <img src="https://travis-ci.com/alxhoff/esp32-applications.svg?branch=master">
+  </a>
+  <a href="https://github.com/alxhoff/esp32-applications/blob/master/LICENSE">
+    <img src="https://img.shields.io/badge/license-GPLv3-blue.svg" />
+  </a>
+</p>
+
 Playing around with the ESP32
 
 ## Applications
